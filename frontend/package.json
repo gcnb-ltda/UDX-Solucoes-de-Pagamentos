@@ -1,18 +1,24 @@
 {
   "name": "udx-payments-web",
-  "version": "0.3.0",
+  "version": "0.1.0-test",
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
     "build": "next build",
-    "start": "next start -H 0.0.0.0"
+    "build:web": "next build",
+    "start": "next start -H 0.0.0.0",
+    "mobile:add:android": "cap add android",
+    "mobile:sync": "cap sync android"
   },
   "dependencies": {
+    "@capacitor/core": "8.5.2",
     "next": "16.3.5",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/cli": "8.5.2",
     "typescript": "5.8.2",
     "@types/node": "22.15.30",
     "@types/react": "^19.2.0",
