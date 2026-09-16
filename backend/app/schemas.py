@@ -44,7 +44,7 @@ class UserCreate(BaseModel):
     full_name: str = Field(min_length=2, max_length=160)
     password: str = Field(min_length=12, max_length=128)
     role: UserRole = UserRole.cashier
-    branch_ids: list[uuid.UUID] = []
+    branch_ids: list[uuid.UUID] = Field(default_factory=list)
 
 
 class UserOut(BaseModel):
