@@ -31,10 +31,10 @@ class BootstrapResponse(BaseModel):
 @router.post("/bootstrap", response_model=BootstrapResponse, status_code=status.HTTP_201_CREATED)
 def bootstrap(
     payload: BootstrapRequest,
-    x_bootstrap_token: str = Header(alias="X-Bootstrap-Token"),
+    x_bootstrap_token: str | None = Header(default=None, alias="X-Bootstrap-Token"),
     db: Session = Depends(get_db),
 ) -> BootstrapResponse:
-    if not secrets.compare_digest(x_bootstrap_token, settings.bootstrap_token):
+    if not secrets.compare_digest(x_bootstrap_token or "", settings.bootstrap_token):
         raise HTTPException(status_code=403, detail="Invalid bootstrap token")
     if db.scalar(select(func.count()).select_from(User)):
         raise HTTPException(status_code=409, detail="Bootstrap already completed")
