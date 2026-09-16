@@ -28,7 +28,6 @@ from app.security import (
     decode_token,
     decrypt_secret,
     encrypt_secret,
-    hash_password,
     provisioning_uri,
     verify_password,
     verify_totp,
@@ -48,7 +47,7 @@ def _issue_tokens(db: Session, user: User) -> TokenPair:
 
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
-    user = db.scalar(select(User).where(User.email == payload.email.lower()))
+    user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
     if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if user.mfa_enabled:
