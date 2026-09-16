@@ -43,9 +43,15 @@ class Settings(BaseSettings):
     mfa_recovery_code_count: int = 10
     allow_manual_settlement: bool = False
 
+    payment_provider: str = "disabled"
+    payment_provider_webhook_secret: str | None = None
+    payment_provider_timeout_seconds: int = 10
+    webhook_replay_window_seconds: int = 300
+
     @model_validator(mode="after")
     def validate_security_configuration(self) -> "Settings":
-        if self.app_env.lower() != "production":
+        environment = self.app_env.lower()
+        if environment != "production":
             return self
         if len(self.app_secret_key) < 32 or self.app_secret_key.startswith("dev-"):
             raise ValueError("APP_SECRET_KEY must be a strong production secret")
@@ -53,6 +59,13 @@ class Settings(BaseSettings):
             raise ValueError("BOOTSTRAP_TOKEN must be a strong production secret")
         if self.allow_manual_settlement:
             raise ValueError("Manual settlement must be disabled in production")
+        if self.payment_provider == "mock":
+            raise ValueError("Mock payment provider is forbidden in production")
+        if self.payment_provider != "disabled":
+            if not self.payment_provider_webhook_secret:
+                raise ValueError("PAYMENT_PROVIDER_WEBHOOK_SECRET is required")
+            if len(self.payment_provider_webhook_secret) < 32:
+                raise ValueError("PAYMENT_PROVIDER_WEBHOOK_SECRET is too short")
         if self.secret_provider == "aws" and not self.aws_secret_name:
             raise ValueError("AWS_SECRET_NAME is required for production AWS secrets")
         if self.secret_provider == "env":
