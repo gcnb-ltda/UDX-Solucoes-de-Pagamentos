@@ -75,8 +75,8 @@ def verify_mfa(
     try:
         claims = decode_token(payload.challenge_token, "mfa_challenge")
         user = db.get(User, uuid.UUID(claims["sub"]))
-    except (ValueError, KeyError, TypeError):
-        raise HTTPException(status_code=401, detail="Invalid MFA challenge")
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(status_code=401, detail="Invalid MFA challenge") from exc
     if (
         not user
         or not user.is_active
@@ -95,8 +95,8 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair
         claims = decode_token(payload.refresh_token, "refresh")
         user_id = uuid.UUID(claims["sub"])
         jti = claims["jti"]
-    except (ValueError, KeyError, TypeError):
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(status_code=401, detail="Invalid refresh token") from exc
     session = db.scalar(select(RefreshSession).where(RefreshSession.jti == jti))
     now = datetime.now(UTC)
     if not session or session.revoked_at or session.expires_at <= now:
