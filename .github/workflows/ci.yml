@@ -16,8 +16,7 @@ jobs:
           POSTGRES_DB: udx_payments
           POSTGRES_USER: udx
           POSTGRES_PASSWORD: udx
-        ports:
-          - 5432:5432
+        ports: [5432:5432]
         options: >-
           --health-cmd "pg_isready -U udx -d udx_payments"
           --health-interval 5s
@@ -31,12 +30,23 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
       API_V1_PREFIX: /api/v1
       CORS_ORIGINS: http://localhost:3000
+      SECRET_PROVIDER: env
+      DATA_ENCRYPTION_KEY: test-data-encryption-key-with-more-than-32-characters
       JWT_ALGORITHM: HS256
       JWT_ISSUER: udx-payments
       JWT_AUDIENCE: udx-payments-api
       JWT_ACCESS_MINUTES: 15
       JWT_REFRESH_DAYS: 7
       JWT_MFA_CHALLENGE_MINUTES: 5
+      JWT_ACTIVE_KID: v2
+      JWT_KEYS_JSON: '{"v1":"old-test-jwt-key-with-more-than-32-characters","v2":"active-test-jwt-key-with-more-than-32-characters"}'
+      AUTH_LOGIN_RATE_LIMIT: 10
+      AUTH_LOGIN_RATE_WINDOW_SECONDS: 60
+      AUTH_MFA_RATE_LIMIT: 8
+      AUTH_MFA_RATE_WINDOW_SECONDS: 300
+      AUTH_LOCK_THRESHOLD: 5
+      AUTH_LOCK_MAX_MINUTES: 60
+      ALLOW_MANUAL_SETTLEMENT: true
     defaults:
       run:
         working-directory: backend
@@ -50,6 +60,23 @@ jobs:
       - run: ruff check .
       - run: alembic upgrade head
       - run: pytest -q
+
+  security:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --upgrade pip
+      - run: pip install '.[security]'
+      - run: bandit -q -r app -x app/core/config.py
+      - name: Dependency vulnerability audit
+        continue-on-error: true
+        run: pip-audit --desc
 
   frontend:
     runs-on: ubuntu-latest
