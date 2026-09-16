@@ -1,7 +1,8 @@
+import base64
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pyotp
 from cryptography.fernet import Fernet
@@ -15,8 +16,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def _fernet() -> Fernet:
     digest = hashlib.sha256(settings.app_secret_key.encode()).digest()
-    import base64
-
     return Fernet(base64.urlsafe_b64encode(digest))
 
 
@@ -48,8 +47,13 @@ def provisioning_uri(secret: str, email: str) -> str:
     return pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="UDX Payments")
 
 
-def _encode(subject: str, token_type: str, expires_delta: timedelta, **claims: object) -> tuple[str, str, datetime]:
-    now = datetime.now(timezone.utc)
+def _encode(
+    subject: str,
+    token_type: str,
+    expires_delta: timedelta,
+    **claims: object,
+) -> tuple[str, str, datetime]:
+    now = datetime.now(UTC)
     expires_at = now + expires_delta
     jti = secrets.token_hex(16)
     payload = {
