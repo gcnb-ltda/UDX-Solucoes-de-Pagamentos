@@ -47,6 +47,9 @@ jobs:
       AUTH_LOCK_THRESHOLD: 5
       AUTH_LOCK_MAX_MINUTES: 60
       ALLOW_MANUAL_SETTLEMENT: true
+      PAYMENT_PROVIDER: mock
+      PAYMENT_PROVIDER_WEBHOOK_SECRET: test-webhook-secret-with-more-than-32-characters
+      WEBHOOK_REPLAY_WINDOW_SECONDS: 300
     defaults:
       run:
         working-directory: backend
@@ -58,6 +61,7 @@ jobs:
       - run: pip install --upgrade pip
       - run: pip install '.[dev]'
       - run: ruff check .
+      - run: python -m compileall -q app
       - run: alembic upgrade head
       - run: pytest -q
 
@@ -75,7 +79,6 @@ jobs:
       - run: pip install '.[security]'
       - run: bandit -q -r app -x app/core/config.py
       - name: Dependency vulnerability audit
-        continue-on-error: true
         run: pip-audit --desc
 
   frontend:
@@ -88,7 +91,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: frontend/package.json
       - run: npm install
+      - run: npm audit --audit-level=high
       - run: npm run build
+
+  containers:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t udx-payments-api:test ./backend
+      - run: docker build -t udx-payments-web:test ./frontend

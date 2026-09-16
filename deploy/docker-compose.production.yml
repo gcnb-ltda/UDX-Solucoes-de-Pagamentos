@@ -1,0 +1,32 @@
+services:
+  migrate:
+    image: ${UDX_BACKEND_IMAGE}
+    command: ["alembic", "upgrade", "head"]
+    env_file: .env.production
+    restart: "no"
+
+  backend:
+    image: ${UDX_BACKEND_IMAGE}
+    env_file: .env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    image: ${UDX_WEB_IMAGE}
+    environment:
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"

@@ -1,12 +1,20 @@
 FROM python:3.12-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
 WORKDIR /app
 
-COPY pyproject.toml alembic.ini ./
-RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
+RUN groupadd --system udx && useradd --system --gid udx --home-dir /app udx
 
+COPY pyproject.toml alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
-COPY tests ./tests
+RUN pip install --upgrade pip && pip install .
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
+RUN chown -R udx:udx /app
+USER udx
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--proxy-headers"]
