@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import secrets
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db import get_db
 from app.models import Branch, Company, User, UserRole
 from app.schemas import CompanyOut, UserOut
@@ -26,7 +29,13 @@ class BootstrapResponse(BaseModel):
 
 
 @router.post("/bootstrap", response_model=BootstrapResponse, status_code=status.HTTP_201_CREATED)
-def bootstrap(payload: BootstrapRequest, db: Session = Depends(get_db)) -> BootstrapResponse:
+def bootstrap(
+    payload: BootstrapRequest,
+    x_bootstrap_token: str = Header(alias="X-Bootstrap-Token"),
+    db: Session = Depends(get_db),
+) -> BootstrapResponse:
+    if not secrets.compare_digest(x_bootstrap_token, settings.bootstrap_token):
+        raise HTTPException(status_code=403, detail="Invalid bootstrap token")
     if db.scalar(select(func.count()).select_from(User)):
         raise HTTPException(status_code=409, detail="Bootstrap already completed")
 
@@ -38,7 +47,11 @@ def bootstrap(payload: BootstrapRequest, db: Session = Depends(get_db)) -> Boots
     db.add(company)
     db.flush()
 
-    branch = Branch(company_id=company.id, name=payload.trade_name or payload.legal_name, tax_id=payload.cnpj)
+    branch = Branch(
+        company_id=company.id,
+        name=payload.trade_name or payload.legal_name,
+        tax_id=payload.cnpj,
+    )
     db.add(branch)
     db.flush()
 
