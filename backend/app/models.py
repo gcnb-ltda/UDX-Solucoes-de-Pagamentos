@@ -1,6 +1,6 @@
-import enum
 import uuid
 from datetime import UTC, datetime
+from enum import StrEnum
 
 from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, String, Table
 from sqlalchemy.dialects.postgresql import UUID
@@ -13,7 +13,7 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class UserRole(str, enum.Enum):
+class UserRole(StrEnum):
     admin = "admin"
     finance = "finance"
     manager = "manager"
