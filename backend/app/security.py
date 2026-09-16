@@ -5,9 +5,10 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import jwt
 import pyotp
 from cryptography.fernet import Fernet
-from jose import JWTError, jwt
+from jwt import InvalidTokenError
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -153,7 +154,7 @@ def decode_token(token: str, expected_type: str) -> dict:
             issuer=settings.jwt_issuer,
             audience=settings.jwt_audience,
         )
-    except (JWTError, ValueError) as exc:
+    except (InvalidTokenError, ValueError) as exc:
         raise ValueError("invalid token") from exc
     if payload.get("type") != expected_type:
         raise ValueError("invalid token type")
