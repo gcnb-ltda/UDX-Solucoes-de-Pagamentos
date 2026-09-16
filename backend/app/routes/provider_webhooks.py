@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
