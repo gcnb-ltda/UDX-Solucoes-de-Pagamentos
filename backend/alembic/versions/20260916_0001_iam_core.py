@@ -16,11 +16,26 @@ down_revision: str | None = None
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
-user_role = sa.Enum("admin", "finance", "manager", "cashier", "accounting", name="user_role")
+user_role = postgresql.ENUM(
+    "admin",
+    "finance",
+    "manager",
+    "cashier",
+    "accounting",
+    name="user_role",
+    create_type=False,
+)
 
 
 def upgrade() -> None:
-    user_role.create(op.get_bind(), checkfirst=True)
+    postgresql.ENUM(
+        "admin",
+        "finance",
+        "manager",
+        "cashier",
+        "accounting",
+        name="user_role",
+    ).create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "companies",
@@ -101,4 +116,4 @@ def downgrade() -> None:
     op.drop_table("users")
     op.drop_table("branches")
     op.drop_table("companies")
-    user_role.drop(op.get_bind(), checkfirst=True)
+    postgresql.ENUM(name="user_role").drop(op.get_bind(), checkfirst=True)
