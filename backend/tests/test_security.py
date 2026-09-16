@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 
+import jwt
 import pyotp
 from conftest import ADMIN_EMAIL, ADMIN_PASSWORD
 from fastapi.testclient import TestClient
-from jose import jwt
 from sqlalchemy import select
 
 from app.core.config import settings
