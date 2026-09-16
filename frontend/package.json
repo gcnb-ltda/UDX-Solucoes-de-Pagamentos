@@ -11,5 +11,11 @@
     "next": "15.5.24",
     "react": "19.1.8",
     "react-dom": "19.1.8"
+  },
+  "devDependencies": {
+    "typescript": "5.8.2",
+    "@types/node": "20.17.6",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0"
   }
 }
