@@ -1,0 +1,160 @@
+import base64
+import hashlib
+import hmac
+import secrets
+import uuid
+from datetime import UTC, datetime, timedelta
+
+import pyotp
+from cryptography.fernet import Fernet
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+from app.core.config import settings
+from app.core.secrets import (
+    get_active_jwt_kid,
+    get_data_encryption_material,
+    get_jwt_key_ring,
+)
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def _fernet() -> Fernet:
+    digest = hashlib.sha256(get_data_encryption_material().encode()).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    return pwd_context.verify(password, password_hash)
+
+
+def encrypt_secret(secret: str) -> str:
+    return _fernet().encrypt(secret.encode()).decode()
+
+
+def decrypt_secret(value: str) -> str:
+    return _fernet().decrypt(value.encode()).decode()
+
+
+def create_totp_secret() -> str:
+    return pyotp.random_base32()
+
+
+def verify_totp(secret: str, code: str) -> bool:
+    return pyotp.TOTP(secret).verify(code, valid_window=1)
+
+
+def provisioning_uri(secret: str, email: str) -> str:
+    return pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="UDX Payments")
+
+
+def generate_recovery_codes(count: int | None = None) -> list[str]:
+    total = count or settings.mfa_recovery_code_count
+    codes: list[str] = []
+    for _ in range(total):
+        raw = "".join(secrets.choice(_RECOVERY_ALPHABET) for _ in range(12))
+        codes.append(f"{raw[:4]}-{raw[4:8]}-{raw[8:]}")
+    return codes
+
+
+def normalize_recovery_code(code: str) -> str:
+    return code.replace("-", "").replace(" ", "").upper()
+
+
+def hash_recovery_code(code: str) -> str:
+    material = get_data_encryption_material().encode()
+    normalized = normalize_recovery_code(code).encode()
+    return hmac.new(material, normalized, hashlib.sha256).hexdigest()
+
+
+def verify_recovery_code(code: str, expected_hash: str) -> bool:
+    return hmac.compare_digest(hash_recovery_code(code), expected_hash)
+
+
+def hash_sensitive_value(value: str) -> str:
+    material = get_data_encryption_material().encode()
+    return hmac.new(material, value.strip().encode(), hashlib.sha256).hexdigest()
+
+
+def _encode(
+    subject: str,
+    token_type: str,
+    expires_delta: timedelta,
+    **claims: object,
+) -> tuple[str, str, datetime]:
+    now = datetime.now(UTC)
+    expires_at = now + expires_delta
+    jti = secrets.token_hex(16)
+    kid = get_active_jwt_kid()
+    key = get_jwt_key_ring()[kid]
+    payload = {
+        "sub": subject,
+        "type": token_type,
+        "jti": jti,
+        "iat": int(now.timestamp()),
+        "exp": int(expires_at.timestamp()),
+        "iss": settings.jwt_issuer,
+        "aud": settings.jwt_audience,
+        **claims,
+    }
+    token = jwt.encode(
+        payload,
+        key,
+        algorithm=settings.jwt_algorithm,
+        headers={"kid": kid},
+    )
+    return token, jti, expires_at
+
+
+def create_access_token(user_id: uuid.UUID, company_id: uuid.UUID, role: str) -> str:
+    token, _, _ = _encode(
+        str(user_id),
+        "access",
+        timedelta(minutes=settings.jwt_access_minutes),
+        company_id=str(company_id),
+        role=role,
+    )
+    return token
+
+
+def create_refresh_token(user_id: uuid.UUID) -> tuple[str, str, datetime]:
+    return _encode(str(user_id), "refresh", timedelta(days=settings.jwt_refresh_days))
+
+
+def create_mfa_challenge(user_id: uuid.UUID) -> str:
+    token, _, _ = _encode(
+        str(user_id),
+        "mfa_challenge",
+        timedelta(minutes=settings.jwt_mfa_challenge_minutes),
+    )
+    return token
+
+
+def decode_token(token: str, expected_type: str) -> dict:
+    try:
+        header = jwt.get_unverified_header(token)
+        kid = header.get("kid")
+        if kid is None:
+            key = settings.app_secret_key
+        else:
+            key = get_jwt_key_ring().get(str(kid))
+            if not key:
+                raise ValueError("unknown jwt key id")
+        payload = jwt.decode(
+            token,
+            key,
+            algorithms=[settings.jwt_algorithm],
+            issuer=settings.jwt_issuer,
+            audience=settings.jwt_audience,
+        )
+    except (JWTError, ValueError) as exc:
+        raise ValueError("invalid token") from exc
+    if payload.get("type") != expected_type:
+        raise ValueError("invalid token type")
+    return payload
