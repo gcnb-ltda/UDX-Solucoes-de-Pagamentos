@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -40,29 +40,49 @@ def _issue_tokens(db: Session, user: User) -> TokenPair:
     access = create_access_token(user.id, user.company_id, user.role.value)
     refresh, jti, expires_at = create_refresh_token(user.id)
     db.add(RefreshSession(user_id=user.id, jti=jti, expires_at=expires_at))
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     db.commit()
-    return TokenPair(access_token=access, refresh_token=refresh, expires_in=settings.jwt_access_minutes * 60)
+    return TokenPair(
+        access_token=access,
+        refresh_token=refresh,
+        expires_in=settings.jwt_access_minutes * 60,
+    )
 
 
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
     user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
-    if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if not user or not user.is_active or not verify_password(
+        payload.password, user.password_hash
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
     if user.mfa_enabled:
-        return LoginResponse(mfa_required=True, challenge_token=create_mfa_challenge(user.id))
+        return LoginResponse(
+            mfa_required=True,
+            challenge_token=create_mfa_challenge(user.id),
+        )
     return LoginResponse(mfa_required=False, tokens=_issue_tokens(db, user))
 
 
 @router.post("/mfa/verify", response_model=TokenPair)
-def verify_mfa(payload: MfaVerifyRequest, db: Session = Depends(get_db)) -> TokenPair:
+def verify_mfa(
+    payload: MfaVerifyRequest,
+    db: Session = Depends(get_db),
+) -> TokenPair:
     try:
         claims = decode_token(payload.challenge_token, "mfa_challenge")
         user = db.get(User, uuid.UUID(claims["sub"]))
     except (ValueError, KeyError, TypeError):
         raise HTTPException(status_code=401, detail="Invalid MFA challenge")
-    if not user or not user.is_active or not user.mfa_enabled or not user.mfa_secret_encrypted:
+    if (
+        not user
+        or not user.is_active
+        or not user.mfa_enabled
+        or not user.mfa_secret_encrypted
+    ):
         raise HTTPException(status_code=401, detail="MFA unavailable")
     if not verify_totp(decrypt_secret(user.mfa_secret_encrypted), payload.code):
         raise HTTPException(status_code=401, detail="Invalid MFA code")
@@ -78,7 +98,7 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair
     except (ValueError, KeyError, TypeError):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     session = db.scalar(select(RefreshSession).where(RefreshSession.jti == jti))
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if not session or session.revoked_at or session.expires_at <= now:
         raise HTTPException(status_code=401, detail="Refresh session invalid")
     user = db.get(User, user_id)
@@ -94,12 +114,13 @@ def logout(payload: LogoutRequest, db: Session = Depends(get_db)) -> None:
     try:
         claims = decode_token(payload.refresh_token, "refresh")
     except ValueError:
-        return None
-    session = db.scalar(select(RefreshSession).where(RefreshSession.jti == claims.get("jti")))
+        return
+    session = db.scalar(
+        select(RefreshSession).where(RefreshSession.jti == claims.get("jti"))
+    )
     if session and not session.revoked_at:
-        session.revoked_at = datetime.now(timezone.utc)
+        session.revoked_at = datetime.now(UTC)
         db.commit()
-    return None
 
 
 @router.get("/me", response_model=UserOut)
@@ -108,12 +129,18 @@ def me(user: User = Depends(get_current_user)) -> User:
 
 
 @router.post("/mfa/setup", response_model=MfaSetupResponse)
-def setup_mfa(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> MfaSetupResponse:
+def setup_mfa(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MfaSetupResponse:
     secret = create_totp_secret()
     user.mfa_secret_encrypted = encrypt_secret(secret)
     user.mfa_enabled = False
     db.commit()
-    return MfaSetupResponse(secret=secret, provisioning_uri=provisioning_uri(secret, user.email))
+    return MfaSetupResponse(
+        secret=secret,
+        provisioning_uri=provisioning_uri(secret, user.email),
+    )
 
 
 @router.post("/mfa/confirm", status_code=204)
@@ -128,4 +155,3 @@ def confirm_mfa(
         raise HTTPException(status_code=400, detail="Invalid MFA code")
     user.mfa_enabled = True
     db.commit()
-    return None
