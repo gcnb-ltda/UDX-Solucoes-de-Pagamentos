@@ -121,7 +121,7 @@ function Catalog() {
 }
 
 function Risk() {
-  return <><div className="risk-banner"><span>RISCO MODERADO</span><strong>Score 64 / 100</strong><p>Evento requer revisão humana antes de qualquer ação irreversível.</p></div><div className="grid-2"><div className="panel"><h3>Sinais observados</h3>{["Frequência acima do padrão","Novo dispositivo","Valor fora da média","Geolocalização consistente"].map((x,i)=><div className="signal" key={x}><b className={i<2?"dot warn":"dot ok"} />{x}<span>{i<2?"Revisar":"OK"}</span></div>)}</div><div className="panel"><h3>Decisão</h3><textarea placeholder="Justificativa obrigatória" /><div className="decision-buttons"><button>Liberar</button><button className="danger">Bloquear</button><button className="primary">Solicitar revisão</button></div></div></div>;
+  return <><div className="risk-banner"><span>RISCO MODERADO</span><strong>Score 64 / 100</strong><p>Evento requer revisão humana antes de qualquer ação irreversível.</p></div><div className="grid-2"><div className="panel"><h3>Sinais observados</h3>{["Frequência acima do padrão","Novo dispositivo","Valor fora da média","Geolocalização consistente"].map((x,i)=><div className="signal" key={x}><b className={i<2?"dot warn":"dot ok"} />{x}<span>{i<2?"Revisar":"OK"}</span></div>)}</div><div className="panel"><h3>Decisão</h3><textarea placeholder="Justificativa obrigatória" /><div className="decision-buttons"><button>Liberar</button><button className="danger">Bloquear</button><button className="primary">Solicitar revisão</button></div></div></div></>;
 }
 
 function Pattern({ screen }: { screen: ScreenDefinition }) {
