@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "UDX Soluções de Pagamentos",
-  description: "Plataforma empresarial de pagamentos e recebimentos UDX.",
+  title: "UDX Pay — 114 telas",
+  description: "Sistema de interfaces da UDX Soluções de Pagamentos.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <html lang="pt-BR">
-      <body style={{ margin: 0, background: "#090909", color: "#ffffff", fontFamily: "Arial, sans-serif" }}>
-        {children}
-      </body>
-    </html>
-  );
+  return <html lang="pt-BR"><body>{children}</body></html>;
 }
